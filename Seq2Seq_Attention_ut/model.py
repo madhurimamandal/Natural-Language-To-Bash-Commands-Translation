@@ -14,14 +14,24 @@ class Encoder(nn.Module):
         self.rnn = nn.GRU(emb_dim, enc_hid_dim, bidirectional = True)        
         self.fc = nn.Linear(enc_hid_dim * 2, dec_hid_dim)        
         self.dropout = nn.Dropout(dropout)
-        self.linear1 = nn.Linear(dec_hid_dim, num_ut)
+        #self.linear1 = nn.Linear(dec_hid_dim, num_ut)
+        self.linear1 = nn.Linear(dec_hid_dim*2, 1)
+        self.linear2 = nn.Linear(config.MAX_LEN, num_ut)
         self.utd = utd
         
     def forward(self, src):
         embedded = self.dropout(self.embedding(src))
-        outputs, hidden = self.rnn(embedded)
+        outputs, hidden = self.rnn(embedded)      #[70, 8, 1024]    #[2, 8, 512]
+        
         hidden = torch.tanh(self.fc(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim = 1)))
-        ut = self.linear1(hidden)  #[8, 118]
+
+        out = outputs.permute(1, 0, 2)     #[8, 70, 1024]
+
+        out = self.linear1(out)
+        out = out.squeeze(2)
+        ut = self.linear2(out)
+
+        print('ut shape', ut.shape) #[8, 118] 
 
         _, ui = torch.topk(ut, k=2, dim=1)   #[8, 2]
 
